@@ -26,6 +26,9 @@ if errorlevel 1 goto :error
 ".build-venv\Scripts\python.exe" -m unittest discover -s tests -v
 if errorlevel 1 goto :error
 
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\fetch-exiftool.ps1" -Destination "build-assets\tools\exiftool"
+if errorlevel 1 goto :error
+
 ".build-venv\Scripts\python.exe" -m PyInstaller ^
   --noconfirm ^
   --clean ^
@@ -34,10 +37,19 @@ if errorlevel 1 goto :error
   --name "DNG-to-JPEG" ^
   --collect-all rawpy ^
   --collect-all PIL ^
+  --add-binary "build-assets\tools\exiftool\exiftool.exe;tools\exiftool" ^
+  --add-data "build-assets\tools\exiftool\exiftool_files;tools\exiftool\exiftool_files" ^
+  --add-data "build-assets\tools\exiftool\README.txt;tools\exiftool" ^
   src\dng_to_jpeg_gui.py
 if errorlevel 1 goto :error
 
-echo Build complete: dist\DNG-to-JPEG.exe
+powershell -NoProfile -Command "$p = Start-Process -FilePath 'dist\DNG-to-JPEG.exe' -ArgumentList '--verify-portable' -Wait -PassThru -WindowStyle Hidden; exit $p.ExitCode"
+if errorlevel 1 goto :error
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\package-portable.ps1"
+if errorlevel 1 goto :error
+
+echo Build complete: dist\DNG-to-JPEG-Windows-Portable.zip
 pause
 exit /b 0
 

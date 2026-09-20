@@ -7,6 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from dng_to_jpeg_gui import (  # noqa: E402
+    find_bundled_exiftool,
     find_dng_files,
     human_size,
     metadata_mismatches,
@@ -33,6 +34,14 @@ class HelperTests(unittest.TestCase):
             (root / "b.dng").touch()
             (root / "ignore.jpg").touch()
             self.assertEqual(len(find_dng_files(root, recursive=False)), 2)
+
+    def test_find_bundled_exiftool_uses_portable_layout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            executable = root / "tools" / "exiftool" / "exiftool.exe"
+            executable.parent.mkdir(parents=True)
+            executable.touch()
+            self.assertEqual(find_bundled_exiftool(root), executable)
 
     def test_exif_rational_altitude_rounding_is_not_a_mismatch(self):
         source = {"GPSAltitude": 227.5271199}

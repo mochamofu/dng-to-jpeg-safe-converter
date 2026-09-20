@@ -32,6 +32,10 @@ jobs:
           ruff format --check src tests
           python -m unittest discover -s tests -v
 
+      - name: Fetch and verify official ExifTool
+        shell: pwsh
+        run: ./scripts/fetch-exiftool.ps1 -Destination "build-assets/tools/exiftool"
+
       - name: Build executable
         run: >-
           python -m PyInstaller
@@ -42,29 +46,32 @@ jobs:
           --name DNG-to-JPEG
           --collect-all rawpy
           --collect-all PIL
+          --add-binary "build-assets/tools/exiftool/exiftool.exe;tools/exiftool"
+          --add-data "build-assets/tools/exiftool/exiftool_files;tools/exiftool/exiftool_files"
+          --add-data "build-assets/tools/exiftool/README.txt;tools/exiftool"
           src/dng_to_jpeg_gui.py
+
+      - name: Smoke-test embedded ExifTool
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath "dist/DNG-to-JPEG.exe" -ArgumentList "--verify-portable" -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Portable self-test failed: $($process.ExitCode)" }
 
       - name: Package release
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path package | Out-Null
-          Copy-Item dist/DNG-to-JPEG.exe package/
-          Copy-Item README.md,LICENSE,THIRD_PARTY_NOTICES.md package/
-          Copy-Item licenses package/licenses -Recurse
-          Compress-Archive -Path package/* -DestinationPath DNG-to-JPEG-Windows.zip
-          (Get-FileHash DNG-to-JPEG-Windows.zip -Algorithm SHA256).Hash + "  DNG-to-JPEG-Windows.zip" | Set-Content SHA256SUMS.txt
+        run: ./scripts/package-portable.ps1
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: DNG-to-JPEG-Windows
           path: |
-            DNG-to-JPEG-Windows.zip
-            SHA256SUMS.txt
+            dist/DNG-to-JPEG-Windows-Portable.zip
+            dist/SHA256SUMS.txt
 
       - name: Publish GitHub release for tags
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" DNG-to-JPEG-Windows.zip SHA256SUMS.txt --generate-notes --verify-tag
+        run: gh release create "${{ github.ref_name }}" dist/DNG-to-JPEG-Windows-Portable.zip dist/SHA256SUMS.txt --notes-file RELEASE_NOTES.md --verify-tag

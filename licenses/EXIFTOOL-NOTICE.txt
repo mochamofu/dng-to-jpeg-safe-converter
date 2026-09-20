@@ -1,0 +1,22 @@
+ExifTool third-party notice
+===========================
+
+ExifTool version 13.59
+Copyright 2003-2026 Phil Harvey
+Official project: https://exiftool.org/
+
+ExifTool states that it is free software that may be redistributed and/or
+modified under the same terms as Perl itself. The official 64-bit Windows
+package also contains its own GPL and Strawberry Perl license materials.
+
+This project embeds the official 64-bit Windows distribution without changing
+ExifTool's program code. The upstream launcher filename is changed from
+"exiftool(-k).exe" to "exiftool.exe", following the upstream Windows package
+instructions, so that the launcher does not pause for keyboard input.
+
+The embedded distribution retains its `exiftool_files` directory, including
+the ExifTool source script and upstream license materials. The build downloads
+a pinned upstream archive and verifies its SHA-256 digest before embedding it.
+
+This notice does not replace the upstream license files embedded in the
+portable executable.

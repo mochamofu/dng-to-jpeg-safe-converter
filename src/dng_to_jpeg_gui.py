@@ -20,7 +20,7 @@ import rawpy
 from PIL import Image
 
 APP_NAME = "DNG → JPEG 安全一括変換"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.1.0"
 SUPPORTED_SUFFIXES = {".dng"}
 METADATA_TAGS = (
     "DateTimeOriginal",
@@ -100,11 +100,34 @@ def validate_exiftool(executable: Path) -> tuple[bool, str]:
     return True, version.splitlines()[-1].strip()
 
 
-def detect_exiftool() -> str:
-    """Find common ExifTool download layouts without scanning the whole PC."""
-    app_folder = (
-        Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+def application_folder() -> Path:
+    return Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+
+
+def resource_folder() -> Path:
+    """Return PyInstaller's extracted resource directory or the source directory."""
+    bundle_folder = getattr(sys, "_MEIPASS", None)
+    return Path(bundle_folder) if bundle_folder else Path(__file__).parent
+
+
+def find_bundled_exiftool(folder: Path) -> Path | None:
+    """Return the portable ExifTool shipped beside the application, if present."""
+    candidates = (
+        folder / "tools" / "exiftool" / "exiftool.exe",
+        folder / "tools" / "exiftool" / "exiftool(-k).exe",
+        folder / "exiftool" / "exiftool.exe",
+        folder / "exiftool" / "exiftool(-k).exe",
     )
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
+def detect_exiftool() -> str:
+    """Prefer the bundled portable copy, then find common external layouts."""
+    app_folder = application_folder()
+    bundled = find_bundled_exiftool(resource_folder()) or find_bundled_exiftool(app_folder)
+    if bundled:
+        return str(bundled)
+
     direct_candidates = [
         app_folder / "exiftool.exe",
         app_folder / "exiftool(-k).exe",
@@ -126,6 +149,15 @@ def detect_exiftool() -> str:
         except OSError:
             pass
     return ""
+
+
+def verify_portable_install() -> int:
+    """Return success only when the embedded ExifTool exists and can run."""
+    executable = find_bundled_exiftool(resource_folder())
+    if not executable:
+        return 2
+    ok, _detail = validate_exiftool(executable)
+    return 0 if ok else 1
 
 
 def find_dng_files(source: Path, recursive: bool) -> list[Path]:
@@ -262,12 +294,27 @@ class ConverterApp(tk.Tk):
         self.cached_source: Path | None = None
 
         settings = self.load_settings()
+        self.bundled_exiftool = find_bundled_exiftool(resource_folder()) or find_bundled_exiftool(
+            application_folder()
+        )
         self.source_var = tk.StringVar(value=settings.get("source", ""))
         self.output_var = tk.StringVar(value=settings.get("output", ""))
-        self.exiftool_var = tk.StringVar(value=settings.get("exiftool", "") or detect_exiftool())
+        self.exiftool_var = tk.StringVar(
+            value=(
+                str(self.bundled_exiftool)
+                if self.bundled_exiftool
+                else settings.get("exiftool", "") or detect_exiftool()
+            )
+        )
         self.quality_var = tk.IntVar(value=int(settings.get("quality", 92)))
         self.recursive_var = tk.BooleanVar(value=bool(settings.get("recursive", True)))
-        self.status_var = tk.StringVar(value="フォルダとExifToolを選択してください")
+        self.status_var = tk.StringVar(
+            value=(
+                "DNGフォルダを選択してください（ExifTool内蔵）"
+                if self.bundled_exiftool
+                else "フォルダとExifToolを選択してください"
+            )
+        )
         self.size_var = tk.StringVar(value="変換前: —    変換後: —    削減量: —")
         self.progress_var = tk.DoubleVar(value=0)
 
@@ -292,14 +339,22 @@ class ConverterApp(tk.Tk):
             outer, 2, "DNGフォルダ", self.source_var, self.choose_source, directory=True
         )
         self.add_path_row(outer, 3, "出力先", self.output_var, self.choose_output, directory=True)
-        self.add_path_row(
-            outer,
-            4,
-            "ExifTool",
-            self.exiftool_var,
-            self.choose_exiftool,
-            directory=False,
-        )
+        if self.bundled_exiftool:
+            ttk.Label(outer, text="メタデータ", width=13).grid(row=4, column=0, sticky="w", pady=4)
+            ttk.Label(
+                outer,
+                text="ExifTool 内蔵（設定不要）",
+                foreground="#176b38",
+            ).grid(row=4, column=1, columnspan=2, sticky="w", padx=(4, 8), pady=4)
+        else:
+            self.add_path_row(
+                outer,
+                4,
+                "ExifTool",
+                self.exiftool_var,
+                self.choose_exiftool,
+                directory=False,
+            )
 
         options = ttk.Frame(outer)
         options.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(10, 8))
@@ -444,7 +499,11 @@ class ConverterApp(tk.Tk):
             messagebox.showerror("入力エラー", "出力先フォルダを選択してください。")
             return None
         if not exiftool_text:
-            messagebox.showerror("入力エラー", "ExifToolの実行ファイルを選択してください。")
+            messagebox.showerror(
+                "入力エラー",
+                "ExifToolが見つかりません。\n"
+                "ポータブル版をもう一度展開するか、ExifToolを指定してください。",
+            )
             return None
         source = Path(source_text)
         output = Path(output_text)
@@ -675,7 +734,7 @@ class ConverterApp(tk.Tk):
                     {
                         "source": self.source_var.get(),
                         "output": self.output_var.get(),
-                        "exiftool": self.exiftool_var.get(),
+                        "exiftool": "" if self.bundled_exiftool else self.exiftool_var.get(),
                         "quality": int(self.quality_var.get()),
                         "recursive": self.recursive_var.get(),
                     },
@@ -719,7 +778,10 @@ def show_fatal_error(exc: BaseException) -> None:
 
 
 if __name__ == "__main__":
-    try:
-        ConverterApp().mainloop()
-    except Exception as error:  # noqa: BLE001 - last-resort GUI error dialog
-        show_fatal_error(error)
+    if "--verify-portable" in sys.argv:
+        raise SystemExit(verify_portable_install())
+    else:
+        try:
+            ConverterApp().mainloop()
+        except Exception as error:  # noqa: BLE001 - last-resort GUI error dialog
+            show_fatal_error(error)

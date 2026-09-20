@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 build/
+build-assets/
 dist/
 release/
 *.spec
@@ -10,4 +11,3 @@ release/
 .vscode/
 Thumbs.db
 .DS_Store
-

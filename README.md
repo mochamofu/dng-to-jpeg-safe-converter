@@ -22,8 +22,8 @@ A safety-first Windows desktop app that batch-converts DNG/Apple ProRAW files to
 - サブフォルダ構造を維持
 - 主要メタデータを変換後に読み戻して確認
 - 途中停止対応
-- ExifToolの公式配布名 `exiftool(-k).exe` をそのまま指定可能
-- ダウンロードフォルダ内のExifToolを自動検出
+- 公式ExifTool 13.59（64-bit）をEXE内に内蔵
+- ExifToolの別途ダウンロード・インストール・場所指定は不要
 
 ### 安全設計
 
@@ -35,20 +35,19 @@ A safety-first Windows desktop app that batch-converts DNG/Apple ProRAW files to
 
 ### Windowsで使う
 
-1. [ExifTool公式サイト](https://exiftool.org/)からWindows版をダウンロードして解凍します。
-2. ReleasesからZIPをダウンロードして展開します。
-3. `DNG-to-JPEG.exe` を起動します。
-4. DNGフォルダ、出力先、ExifToolを指定します。
-5. 最初に「最初の10枚をテスト」を実行します。
-6. 画質・日時・位置情報・向きを確認してから全件変換します。
+1. Releasesから `DNG-to-JPEG-Windows-Portable.zip` をダウンロードして展開します。
+2. `DNG-to-JPEG.exe` を起動します。
+3. DNGフォルダと出力先を指定します。
+4. 最初に「最初の10枚をテスト」を実行します。
+5. 画質・日時・位置情報・向きを確認してから全件変換します。
 
-ExifTool本体は本リポジトリおよび配布EXEに含まれません。
+ExifToolは配布EXE内に内蔵されているため、別途準備する必要はありません。実行時に写真やGPS情報をネットワークへ送信することもありません。
 
 配布EXEは現時点ではコード署名されていません。そのためWindows SmartScreenが初回起動時に確認を表示する場合があります。署名のないEXEを使いたくない場合は、公開ソースから `scripts/build-exe.bat` で自身のPC上にビルドしてください。
 
 ### ソースから起動
 
-Python 3.9以降を用意し、`scripts/run.bat` をダブルクリックします。初回だけ仮想環境と依存パッケージを作成します。
+Python 3.10以降を用意し、`scripts/run.bat` をダブルクリックします。ソースから直接起動する場合は外部ExifToolが必要です。`scripts/build-exe.bat` は公式ExifToolの固定バージョンをハッシュ検証し、内蔵済みポータブル版を作成します。
 
 ### JPEG画質について
 
@@ -78,19 +77,18 @@ DNG Safe JPEG Converter is a Windows GUI for batch-developing DNG and Apple ProR
 
 ### Quick start
 
-1. Download and extract ExifTool from the [official website](https://exiftool.org/).
-2. Download and extract the latest Windows release ZIP.
-3. Run `DNG-to-JPEG.exe`.
-4. Select the source folder, output folder, and ExifTool executable.
-5. Run the 10-file test first, inspect the output, and only then run the full batch.
+1. Download and extract `DNG-to-JPEG-Windows-Portable.zip` from Releases.
+2. Run `DNG-to-JPEG.exe`.
+3. Select the source and output folders.
+4. Run the 10-file test first, inspect the output, and only then run the full batch.
 
-ExifTool is not bundled with this project.
+Official ExifTool 13.59 (64-bit) is embedded in the release executable. No separate ExifTool download, installation, or path selection is required. The app does not upload photos or GPS data at runtime.
 
 The release executable is currently unsigned, so Windows SmartScreen may display a warning on first launch. Users who prefer not to run an unsigned release can inspect the source and build locally with `scripts/build-exe.bat`.
 
 ### Build from source
 
-Install Python 3.9 or newer, then run:
+Install Python 3.10 or newer, then run:
 
 ```powershell
 scripts\run.bat
@@ -101,6 +99,8 @@ To build the standalone executable:
 ```powershell
 scripts\build-exe.bat
 ```
+
+The build script downloads the pinned official ExifTool archive, verifies its SHA-256 digest, and embeds it in the executable. Running directly from source still requires an external ExifTool executable.
 
 ### License
 
